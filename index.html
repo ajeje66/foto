@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner QR Code</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      margin: 20px auto;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 1.2em;
+      color: #333;
+      word-wrap: break-word;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Scanner QR Code</h1>
+  <div id="reader"></div>
+  <div id="result">Risultato: <span id="output">Nessuno</span></div>
+  <button onclick="startScanner()">Avvia Scanner</button>
+
+  <!-- Libreria QR code -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script>
+    let html5QrcodeScanner;
+
+    function startScanner() {
+      const qrRegion = document.getElementById('reader');
+      html5QrcodeScanner = new Html5Qrcode("reader");
+
+      html5QrcodeScanner.start(
+        { facingMode: "environment" }, // Usa la fotocamera posteriore
+        {
+          fps: 10,
+          qrbox: 250
+        },
+        qrCodeMessage => {
+          document.getElementById('output').innerText = qrCodeMessage;
+          html5QrcodeScanner.stop();
+        },
+        errorMessage => {
+          // errori minori ignorati
+        }
+      ).catch(err => {
+        console.error("Errore avvio scanner: ", err);
+      });
+    }
+  </script>
+</body>
+</html>
