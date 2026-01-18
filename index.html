@@ -1,45 +1,60 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8">
-  <title>Percorso Castel San Lorenzo - Offline</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<title>Percorso Castel San Lorenzo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- CSS locale -->
-  <link rel="stylesheet" href="leaflet.css" />
+<!-- CSS locale Leaflet -->
+<link rel="stylesheet" href="leaflet.css" />
 
-  <style>
-    body { margin: 0; font-family: system-ui, sans-serif; }
-    #map { height: 50vh; }
-    #instructions { height: 25vh; overflow-y: auto; padding: 10px; background: #f8f8f8; }
-    .step { padding: 8px 0; border-bottom: 1px solid #ddd; }
-    .step b { display: block; }
+<style>
+  body { margin:0; font-family:system-ui,sans-serif; }
+  #map { height:50vh; }
+  #instructions { height:25vh; overflow-y:auto; padding:10px; background:#f8f8f8; }
+  .step { padding: 8px 0; border-bottom: 1px solid #ddd; }
+  .step b { display:block; }
 
-    /* Toast in alto */
-    #toast {
-      visibility: hidden;
-      min-width: 200px;
-      margin-left: -100px;
-      background-color: #333;
-      color: #fff;
-      text-align: center;
-      border-radius: 4px;
-      padding: 10px;
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      z-index: 1000;
-      font-size: 14px;
-      opacity: 0;
-      transition: opacity 0.5s, visibility 0.5s;
-    }
-    #toast.show { visibility: visible; opacity: 1; }
+  /* Toast normale */
+  #toast {
+    visibility:hidden;
+    min-width:200px;
+    background:#333;
+    color:#fff;
+    text-align:center;
+    border-radius:6px;
+    padding:10px;
+    position:fixed;
+    top:20px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:1000;
+    opacity:0;
+    transition:opacity 0.5s, visibility 0.5s;
+  }
+  #toast.show { visibility:visible; opacity:1; }
 
-    #qr-reader { width: 300px; margin: 10px auto; }
-    #qr-result { text-align: center; margin-bottom: 10px; }
-    #codeInput { padding: 5px; width: 180px; }
-    #unlockBtn, #openQrBtn { padding: 5px 10px; margin-left: 5px; }
-  </style>
+  /* QR Toast */
+  #qr-toast {
+    visibility:hidden;
+    position:fixed;
+    top:20px;
+    left:50%;
+    transform:translateX(-50%);
+    background:#333;
+    color:#fff;
+    padding:10px;
+    border-radius:8px;
+    z-index:1000;
+    width:320px;
+  }
+  #qr-toast.show { visibility:visible; }
+
+  #qr-reader { width:300px; margin-top:10px; }
+  #closeToast { margin-top:10px; width:100%; padding:5px; }
+  #codeInput { padding:5px; width:180px; }
+  #unlockBtn, #openQrBtn { padding:5px 10px; margin-left:5px; }
+</style>
 </head>
 <body>
 
@@ -52,9 +67,14 @@
   <button id="openQrBtn">Apri QR</button>
 </div>
 
-<div id="qr-reader"></div>
-<div id="qr-result"></div>
+<!-- QR Toast -->
+<div id="qr-toast">
+  <b>Scansiona il QR</b>
+  <div id="qr-reader"></div>
+  <button id="closeToast">Chiudi</button>
+</div>
 
+<!-- Toast normale -->
 <div id="toast"></div>
 
 <!-- JS locali -->
@@ -63,9 +83,9 @@
 
 <script>
 /* ===== MAPPA ===== */
-const map = L.map("map", { minZoom: 14, maxZoom: 18 });
+const map = L.map("map", { minZoom:14, maxZoom:18 });
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "&copy; OpenStreetMap contributors"
+  attribution:"&copy; OpenStreetMap contributors"
 }).addTo(map);
 
 /* Percorso */
@@ -76,95 +96,112 @@ const routeCoords = [
   [40.4200, 15.2200],
   [40.4220, 15.2300]
 ];
-L.polyline(routeCoords, { color: "blue", weight: 5 }).addTo(map);
+L.polyline(routeCoords, {color:"blue", weight:5}).addTo(map);
 
 /* Limite pan */
 const cityBounds = L.latLngBounds([40.41200, 15.20735], [40.42461, 15.24164]);
 map.fitBounds(cityBounds);
 map.setMaxBounds(cityBounds);
 map.options.maxBoundsViscosity = 1.0;
-map.on("drag", () => map.panInsideBounds(cityBounds, { animate: false }));
+map.on("drag", () => map.panInsideBounds(cityBounds, { animate:false }));
 
 /* Marker iniziale/finale */
 const startMarker = L.marker([40.4162, 15.2075]).addTo(map)
-    .bindPopup("<b>Inizio</b><br>Punto di partenza");
+  .bindPopup("<b>Inizio</b><br>Punto di partenza");
 const endMarker = L.marker([40.4220, 15.2300])
-    .bindPopup("<b>Arrivo</b><br>Punto finale");
+  .bindPopup("<b>Arrivo</b><br>Punto finale");
 
 /* Checkpoint intermedi */
 const intermediateMarkers = [
-  { coords: [40.4170, 15.2100], title: "Checkpoint 1", code: "ABC123", unlocked: false },
-  { coords: [40.4185, 15.2150], title: "Checkpoint 2", code: "DEF456", unlocked: false },
-  { coords: [40.4200, 15.2200], title: "Checkpoint 3", code: "GHI789", unlocked: false }
+  { coords:[40.4170, 15.2100], title:"Checkpoint 1", code:"ABC123", unlocked:false },
+  { coords:[40.4185, 15.2150], title:"Checkpoint 2", code:"DEF456", unlocked:false },
+  { coords:[40.4200, 15.2200], title:"Checkpoint 3", code:"GHI789", unlocked:false }
 ];
 intermediateMarkers.forEach(m => {
   m.marker = L.marker(m.coords)
-             .bindPopup(`<b>${m.title}</b><br>Scansiona il QR o inserisci il codice`);
+    .bindPopup(`<b>${m.title}</b><br>Scansiona il QR o inserisci il codice`);
 });
 
 /* ===== TOAST ===== */
-function showToast(message,duration=2000){
-  const toast=document.getElementById("toast");
-  toast.textContent=message;
+function showToast(msg, duration=2000){
+  const toast = document.getElementById("toast");
+  toast.textContent = msg;
   toast.className="show";
-  setTimeout(()=>{toast.className=toast.className.replace("show","");},duration);
+  setTimeout(()=>{ toast.className = toast.className.replace("show",""); }, duration);
 }
 
-/* ===== FUNZIONE SBLOCCO ===== */
-function unlockNextMarker(inputCode){
-  const next=intermediateMarkers.find(m=>!m.unlocked);
+/* ===== Sblocca checkpoint via codice ===== */
+function unlockNextMarker(code){
+  const next = intermediateMarkers.find(m=>!m.unlocked);
   if(!next){ showToast("Tutti i checkpoint sbloccati!"); return; }
 
-  if(inputCode===next.code){
+  if(code===next.code){
     next.unlocked=true;
     next.marker.addTo(map).openPopup();
-    showToast(next.title+" sbloccato!");
+    showToast(next.title + " sbloccato!");
     if(intermediateMarkers.every(m=>m.unlocked)) endMarker.addTo(map).openPopup();
   } else showToast("Codice errato. Riprova!");
 }
 
-/* Pulsante codice manuale */
 document.getElementById("unlockBtn").addEventListener("click", ()=>{
-  const code=document.getElementById("codeInput").value.trim();
+  const code = document.getElementById("codeInput").value.trim();
   unlockNextMarker(code);
   document.getElementById("codeInput").value="";
 });
 
-/* ===== LETTORE QR SU PULSANTE ===== */
+/* ===== QR TOAST ===== */
 let html5QrCode;
-const qrConfig = { fps: 10, qrbox: 250 };
+function openQrToast(){
+  document.getElementById("qr-toast").classList.add("show");
+  startQr();
+}
+function closeQrToast(){
+  document.getElementById("qr-toast").classList.remove("show");
+  stopQr();
+}
 
-document.getElementById("openQrBtn").addEventListener("click", () => {
-  if(html5QrCode) return; // già attivo
+document.getElementById("openQrBtn").addEventListener("click", openQrToast);
+document.getElementById("closeToast").addEventListener("click", closeQrToast);
 
+/* Avvio e stop QR */
+function startQr(){
+  if(html5QrCode) return;
   html5QrCode = new Html5Qrcode("qr-reader");
   html5QrCode.start(
-    { facingMode: "environment" },
-    qrConfig,
-    decodedText => {
-      const next = intermediateMarkers.find(m => !m.unlocked);
-      if(next && decodedText === next.code){
-        next.unlocked = true;
-        next.marker.addTo(map).openPopup();
-        showToast(next.title + " sbloccato!");
-        if(intermediateMarkers.every(m => m.unlocked)) endMarker.addTo(map).openPopup();
-      } else {
-        showToast("QR non valido o checkpoint già sbloccato");
-      }
-    }
-  ).catch(err => {
-    console.error("Errore apertura QR:", err);
-    showToast("Impossibile aprire la fotocamera");
-  });
-});
+    { facingMode:"environment" },
+    { fps:10, qrbox:250 },
+    onQrSuccess
+  );
+}
+function stopQr(){
+  if(!html5QrCode) return;
+  html5QrCode.stop().then(()=>{
+    html5QrCode.clear();
+    html5QrCode = null;
+  }).catch(()=>{ html5QrCode = null; });
+}
+
+/* Successo QR */
+function onQrSuccess(decodedText){
+  const next = intermediateMarkers.find(m=>!m.unlocked);
+  if(next && decodedText===next.code){
+    next.unlocked=true;
+    next.marker.addTo(map).openPopup();
+    showToast(next.title + " sbloccato!");
+    closeQrToast();
+    if(intermediateMarkers.every(m=>m.unlocked)) endMarker.addTo(map).openPopup();
+  } else {
+    showToast("QR non valido o checkpoint già sbloccato");
+  }
+}
 
 /* ===== TURN-BY-TURN OFFLINE ===== */
 const steps=[
-  {instruction:"Parti dal centro del paese",distance:90},
-  {instruction:"Prosegui lungo Via principale",distance:150},
-  {instruction:"Svolta a sinistra",distance:80},
-  {instruction:"Continua fino al belvedere",distance:120},
-  {instruction:"Arrivo a destinazione",distance:0}
+  {instruction:"Parti dal centro del paese", distance:90},
+  {instruction:"Prosegui lungo Via principale", distance:150},
+  {instruction:"Svolta a sinistra", distance:80},
+  {instruction:"Continua fino al belvedere", distance:120},
+  {instruction:"Arrivo a destinazione", distance:0}
 ];
 
 const container=document.getElementById("instructions");
@@ -175,6 +212,5 @@ steps.forEach((step,index)=>{
   container.appendChild(div);
 });
 </script>
-
 </body>
 </html>
