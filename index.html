@@ -2,216 +2,244 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
-<title>Percorso Castel San Lorenzo</title>
+<title>Percorso Castel San Lorenzo SPA</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- CSS locale Leaflet -->
 <link rel="stylesheet" href="leaflet.css" />
 
 <style>
-  body { margin:0; font-family:system-ui,sans-serif; }
   #map { height:50vh; }
-  #instructions { height:25vh; overflow-y:auto; padding:10px; background:#f8f8f8; }
-  .step { padding: 8px 0; border-bottom: 1px solid #ddd; }
+  #instructions, #descrizione { height:25vh; overflow-y:auto; padding:0 10px; background:#f8f8f8; transition: max-height 0.5s ease, padding 0.5s ease; max-height:0; }
+  #instructions.show, #descrizione.show { max-height:300px; padding:10px; overflow-y:auto; }
+  .step { padding:8px 0; border-bottom:1px solid #ddd; }
   .step b { display:block; }
 
-  /* Toast normale */
-  #toast {
-    visibility:hidden;
-    min-width:200px;
-    background:#333;
-    color:#fff;
-    text-align:center;
-    border-radius:6px;
-    padding:10px;
-    position:fixed;
-    top:20px;
-    left:50%;
-    transform:translateX(-50%);
-    z-index:1000;
-    opacity:0;
-    transition:opacity 0.5s, visibility 0.5s;
-  }
-  #toast.show { visibility:visible; opacity:1; }
+  /* pulsanti */
+  .next-btn { width: 45%; max-width: 160px; height: 52px; margin: 5px; background-color: #d8cbb3; color:#fff; border:none; border-radius:14px; font-size:17px; font-weight:600; box-shadow:0 4px 10px rgba(0,0,0,0.15); }
+  .next-btn:disabled { background:#e5e1d8; color:#9c9c9c; box-shadow:none; cursor:not-allowed; }
+  .btn-secondary { background-color:#d8cbb3; border-radius:20px; color:#f2f2f1; border:2px solid #d8cbb3; padding:5px 10px; margin:5px; }
 
-  /* QR Toast */
-  #qr-toast {
-    visibility:hidden;
-    position:fixed;
-    top:20px;
-    left:50%;
-    transform:translateX(-50%);
-    background:#333;
-    color:#fff;
-    padding:10px;
-    border-radius:8px;
-    z-index:1000;
-    width:320px;
-  }
-  #qr-toast.show { visibility:visible; }
+  /* toast */
+  #toast, #qr-toast { visibility:hidden; background:#333; color:#fff; text-align:center; border-radius:8px; padding:10px; position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:1000; opacity:0; transition:opacity 0.5s, visibility 0.5s; }
+  #toast.show, #qr-toast.show { visibility:visible; opacity:1; }
 
   #qr-reader { width:300px; margin-top:10px; }
   #closeToast { margin-top:10px; width:100%; padding:5px; }
   #codeInput { padding:5px; width:180px; }
-  #unlockBtn, #openQrBtn { padding:5px 10px; margin-left:5px; }
-  
 </style>
 </head>
+
 <body>
-
+<div style="padding:10px 20px;">
+  <div id="progress-container" style="background:#e5e5e5; border-radius:10px; height:20px; width:100%;">
+    <div id="progress-bar" style="background:#d8cbb3; height:100%; width:0%; border-radius:10px;"></div>
+  </div>
+</div>
 <div id="map"></div>
-<div id="instructions"></div>
 
-<div style="padding:10px; background:#eee; text-align:center;">
-  <input id="codeInput" placeholder="Inserisci codice" />
-  <button id="unlockBtn">Sblocca</button>
-  <button id="openQrBtn">Apri QR</button>
+<div style="padding:10px; text-align:center; background:#eee;border-bottom: 1px solid black;">
+  <button class="btn-secondary" id="toggleInstructionsBtn">Mostra istruzioni</button>
+  <button class="btn-secondary" id="toggleDescrizioneBtn">Mostra descrizione</button>
+  <button class="btn-secondary" id="centra">Centra mappa</button>
 </div>
 
-<!-- QR Toast -->
+<div id="instructions"></div>
+<div id="descrizione"></div>
+
+<div style="padding:10px; background:#eee; text-align:center; border-top:1px solid black;">
+  <input autocomplete="off" id="codeInput" placeholder="Inserisci codice">
+  <button class="btn-secondary" id="unlockBtn">Sblocca</button>
+  <button class="btn-secondary" id="openQrBtn">Apri QR</button>
+</div>
+
+
+<div style="display:flex; justify-content:center; padding:20px;">
+  <button id="prev_page" class="next-btn">Indietro</button>
+  <button id="next_page" class="next-btn" disabled>Prosegui</button>
+</div>
+
 <div id="qr-toast">
   <b>Scansiona il QR</b>
   <div id="qr-reader"></div>
   <button id="closeToast">Chiudi</button>
 </div>
 
-<!-- Toast normale -->
 <div id="toast"></div>
 
-<!-- JS locali -->
 <script src="leaflet.js"></script>
 <script src="html5-qrcode.min.js"></script>
 
 <script>
+function aggiornaProgressBar() {
+  const total = Object.keys(TAPPE).length; // numero totale tappe
+  const completed = Math.min(stato.tappa, stato.sbloccata - 1); 
+  const percent = (completed / total) * 100;
+  document.getElementById("progress-bar").style.width = percent + "%";
+}
+
+
+/* ===== STATO SPA ===== */
+let TAPPE = {};
+let stato = { tappa: 1, sbloccata: 1 };
+const salvato = localStorage.getItem("percorso");
+if(salvato) stato = JSON.parse(salvato);
+
 /* ===== MAPPA ===== */
-const map = L.map("map", { minZoom:14, maxZoom:18 });
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution:"&copy; OpenStreetMap contributors"
-}).addTo(map);
-
-/* Percorso */
-const routeCoords = [
-  [40.4162, 15.2075],
-  [40.4170, 15.2100],
-  [40.4185, 15.2150],
-  [40.4200, 15.2200],
-  [40.4220, 15.2300]
-];
-L.polyline(routeCoords, {color:"blue", weight:5}).addTo(map);
-
-/* Limite pan */
-const cityBounds = L.latLngBounds([40.40649, 15.19628], [40.42944, 15.25177]);
-map.fitBounds(cityBounds);
-map.setMaxBounds(cityBounds);
+const map = L.map("map",{minZoom:15,maxZoom:18}).setView([40.4188, 15.2269], 16);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{ attribution:"&copy; OpenStreetMap contributors" }).addTo(map);
+const bounds = L.latLngBounds([40.40649,15.19628],[40.42944,15.25177]);
+map.setMaxBounds(bounds);
 map.options.maxBoundsViscosity = 1.0;
-map.on("drag", () => map.panInsideBounds(cityBounds, { animate:false }));
 
-/* Marker iniziale/finale */
-const startMarker = L.marker([40.4162, 15.2075]).addTo(map)
-  .bindPopup("<b>Inizio</b><br>Punto di partenza");
-const endMarker = L.marker([40.4220, 15.2300])
-  .bindPopup("<b>Arrivo</b><br>Punto finale");
+let unicoMarker; // marker unico
 
-/* Checkpoint intermedi */
-const intermediateMarkers = [
-  { coords:[40.4170, 15.2100], title:"Checkpoint 1", code:"ABC123", unlocked:false },
-  { coords:[40.4185, 15.2150], title:"Checkpoint 2", code:"DEF456", unlocked:false },
-  { coords:[40.4200, 15.2200], title:"Checkpoint 3", code:"GHI789", unlocked:false }
-];
-intermediateMarkers.forEach(m => {
-  m.marker = L.marker(m.coords)
-    .bindPopup(`<b>${m.title}</b><br>Scansiona il QR o inserisci il codice`);
-});
+/* ===== ELEMENTI DOM ===== */
+const nextBtn = document.getElementById("next_page");
+const prevBtn = document.getElementById("prev_page");
+const instructionsDiv = document.getElementById("instructions");
+const descrizioneDiv = document.getElementById("descrizione");
 
 /* ===== TOAST ===== */
-function showToast(msg, duration=2000){
-  const toast = document.getElementById("toast");
-  toast.textContent = msg;
-  toast.className="show";
-  setTimeout(()=>{ toast.className = toast.className.replace("show",""); }, duration);
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2000);
 }
 
-/* ===== Sblocca checkpoint via codice ===== */
-function unlockNextMarker(code){
-  const next = intermediateMarkers.find(m=>!m.unlocked);
-  if(!next){ showToast("Tutti i checkpoint sbloccati!"); return; }
-
-  if(code===next.code){
-    next.unlocked=true;
-    next.marker.addTo(map).openPopup();
-    showToast(next.title + " sbloccato!");
-    if(intermediateMarkers.every(m=>m.unlocked)) endMarker.addTo(map).openPopup();
-  } else showToast("Codice errato. Riprova!");
+/* ===== SBLOCCO ===== */
+let codiciUsati= JSON.parse(localStorage.getItem("codiciUsati")) || [];
+function unlock(code){
+  const t = TAPPE[stato.tappa];
+  if(codiciUsati.includes(code)){
+	showToast("Codice " + code + " già inserito!");
+	return;
+	}
+  if(code === t.unlockCode){
+	codiciUsati.push(code);
+	localStorage.setItem("codiciUsati", JSON.stringify(codiciUsati));
+    stato.sbloccata = Math.max(stato.sbloccata, stato.tappa + 1);
+    localStorage.setItem("percorso", JSON.stringify(stato));
+    nextBtn.disabled = false;
+    showToast("Tappa sbloccata!");
+	document.getElementById("codeInput").value="";
+    closeQrToast();
+  } else {
+    showToast("Codice / QR errato");
+  }
+  nextBtn.disabled = stato.sbloccata < stato.tappa + 1;
+aggiornaProgressBar();
 }
 
-document.getElementById("unlockBtn").addEventListener("click", ()=>{
-  const code = document.getElementById("codeInput").value.trim();
-  unlockNextMarker(code);
-  document.getElementById("codeInput").value="";
-});
+/* ===== BUTTON ===== */
 
-/* ===== QR TOAST ===== */
+document.getElementById("unlockBtn").onclick = ()=>{ unlock(document.getElementById("codeInput").value.trim()); document.getElementById("codeInput").value=""; };
 let html5QrCode;
 function openQrToast(){
   document.getElementById("qr-toast").classList.add("show");
-  startQr();
+  if(!html5QrCode){
+    html5QrCode = new Html5Qrcode("qr-reader");
+    html5QrCode.start(
+      { facingMode:"environment" },
+      { fps:10, qrbox:250 },
+      decodedText => unlock(decodedText)
+    );
+  }
 }
 function closeQrToast(){
   document.getElementById("qr-toast").classList.remove("show");
-  stopQr();
-}
-
-document.getElementById("openQrBtn").addEventListener("click", openQrToast);
-document.getElementById("closeToast").addEventListener("click", closeQrToast);
-
-/* Avvio e stop QR */
-function startQr(){
-  if(html5QrCode) return;
-  html5QrCode = new Html5Qrcode("qr-reader");
-  html5QrCode.start(
-    { facingMode:"environment" },
-    { fps:10, qrbox:250 },
-    onQrSuccess
-  );
-}
-function stopQr(){
-  if(!html5QrCode) return;
-  html5QrCode.stop().then(()=>{
-    html5QrCode.clear();
-    html5QrCode = null;
-  }).catch(()=>{ html5QrCode = null; });
-}
-
-/* Successo QR */
-function onQrSuccess(decodedText){
-  const next = intermediateMarkers.find(m=>!m.unlocked);
-  if(next && decodedText===next.code){
-    next.unlocked=true;
-    next.marker.addTo(map).openPopup();
-    showToast(next.title + " sbloccato!");
-    closeQrToast();
-    if(intermediateMarkers.every(m=>m.unlocked)) endMarker.addTo(map).openPopup();
-  } else {
-    showToast("QR non valido o checkpoint già sbloccato");
+  if(html5QrCode){
+    html5QrCode.stop().then(()=>{
+      html5QrCode.clear();
+      html5QrCode = null;
+    });
   }
 }
+document.getElementById("openQrBtn").onclick = openQrToast;
+document.getElementById("closeToast").onclick = closeQrToast;
 
-/* ===== TURN-BY-TURN OFFLINE ===== */
-const steps=[
-  {instruction:"Parti dal centro del paese", distance:90},
-  {instruction:"Prosegui lungo Via principale", distance:150},
-  {instruction:"Svolta a sinistra", distance:80},
-  {instruction:"Continua fino al belvedere", distance:120},
-  {instruction:"Arrivo a destinazione", distance:0}
-];
+/* ===== TOGGLE ISTRUZIONI/DESCRIZIONE ===== */
+document.getElementById("toggleInstructionsBtn").onclick = function() {
+  instructionsDiv.classList.toggle("show");
+  this.textContent = instructionsDiv.classList.contains("show") ? "Nascondi Istruzioni" : "Mostra istruzioni";
+};
+document.getElementById("toggleDescrizioneBtn").onclick = function() {
+  descrizioneDiv.classList.toggle("show");
+  this.textContent = descrizioneDiv.classList.contains("show") ? "Nascondi Descrizione" : "Mostra Descrizione";
+};
+document.getElementById("centra").onclick = function(){ if(unicoMarker) map.setView(unicoMarker.getLatLng(),16); };
 
-const container=document.getElementById("instructions");
-steps.forEach((step,index)=>{
-  const div=document.createElement("div");
-  div.className="step";
-  div.innerHTML=`<b>${index+1}. ${step.instruction}</b>${step.distance>0? " ("+step.distance+" m)":""}`;
-  container.appendChild(div);
-});
+/* ===== CARICA TAPPA ===== */
+function caricaTappa(n){
+  const t = TAPPE[n];
+  if(!t) return;
+	
+  stato.tappa = n;
+  localStorage.setItem("percorso", JSON.stringify(stato));
+
+  // marker
+  if(!unicoMarker){
+    unicoMarker = L.marker(t.marker).addTo(map);
+    unicoMarker.bindPopup(`<b>${t.titolo}</b><br>${t.popup}`);
+  } else {
+    unicoMarker.setLatLng(t.marker).setPopupContent(`<b>${t.titolo}</b><br>${t.popup}`);
+  }
+  map.setView(t.marker,16);
+
+  // descrizione
+  descrizioneDiv.innerHTML = t.descrizione;
+
+  // istruzioni
+  instructionsDiv.innerHTML = "";
+  t.steps.forEach((step,i)=>{
+    const div = document.createElement("div");
+    div.className="step";
+    div.innerHTML=`<b>${i+1}. ${step.instruction}</b>${step.distance>0?" ("+step.distance+" m)":""}`;
+    instructionsDiv.appendChild(div);
+  });
+
+    // pulsanti
+  const total = Object.keys(TAPPE).length;
+  prevBtn.disabled = n <= 1;
+
+  if(n >= total){
+    nextBtn.textContent = "Fine";
+    nextBtn.disabled = false; // sempre cliccabile all'ultima tappa
+  } else {
+    nextBtn.textContent = "Prosegui";
+    nextBtn.disabled = stato.sbloccata < n + 1;
+  }
+
+  // aggiorna onclick dinamicamente
+  nextBtn.onclick = () => {
+    if(stato.tappa >= total){
+      window.location.href = "https://tuo-sito-di-destinazione.com";
+    } else {
+      caricaTappa(stato.tappa + 1);
+    }
+  };
+  
+  // aggiorna barra di progresso se presente
+  aggiornaProgressBar();
+
+}
+
+/* ===== NAVIGAZIONE ===== */
+nextBtn.onclick = () => { if(!nextBtn.disabled) caricaTappa(stato.tappa + 1); };
+prevBtn.onclick = () => { if(stato.tappa > 1) caricaTappa(stato.tappa - 1); };
+
+/* ===== CARICA TAPPE DA JSON ===== */
+fetch("tappe.json")
+  .then(r=>r.json())
+  .then(data=>{
+    TAPPE = data;
+    caricaTappa(stato.tappa);
+  })
+  .catch(err=>{
+    console.error("Errore caricamento tappe:", err);
+    showToast("Errore caricamento tappe");
+  });
 </script>
+
 </body>
 </html>
