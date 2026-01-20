@@ -1,53 +1,34 @@
 {
   "1": {
-    "titolo": "Punto 1",
-    "marker": [40.418822, 15.226984],
-    "popup": "Santuario Santi Cosma e Damiano",
-    "descrizione": "Descrizione della tappa 1",
-    "steps": [
-      {"instruction": "Parti dal centro del paese", "distance": 90},
-      {"instruction": "Prosegui lungo Via principale", "distance": 150}
+    "titolo": "Tappa 1",
+    "marker": [40.4188, 15.2269],
+    "popup": "Info tappa 1",
+    "descrizione": "Descrizione tappa 1",
+    "steps": [{"instruction": "Parti dal centro del paese", "distance": 90}],
+    "quiz": [
+      {
+        "domanda": "Domanda 1.1?",
+        "risposte": ["A", "B", "C"],
+        "corretta": 1,
+        "punti": 5
+      }
     ],
-    "unlockCode": "A"
+	"unlockCode": "A"
   },
   "2": {
-    "titolo": "Punto 2",
-    "marker": [40.4195, 15.228],
-    "popup": "Altro punto",
-    "descrizione": "Descrizione della tappa 2",
-    "steps": [
-      {"instruction": "Segui la strada", "distance": 100}
+    "titolo": "Tappa 2",
+    "marker": [40.4190, 15.2270],
+    "popup": "Info tappa 2",
+    "descrizione": "Descrizione tappa 2",
+	"steps": [{"instruction": "Parti dal centro del paese", "distance": 90}],
+    "quiz": [
+      {
+        "domanda": "Domanda 2.1?",
+        "risposte": ["A", "B", "C"],
+        "corretta": 2,
+        "punti": 7
+      }
     ],
-    "unlockCode": "B"
-  },
-  "3": {
-    "titolo": "Punto 3",
-    "marker": [40.4195, 15.228],
-    "popup": "Altro punto",
-    "descrizione": "Descrizione della tappa 2",
-    "steps": [
-      {"instruction": "Segui la strada", "distance": 100}
-    ],
-    "unlockCode": "C"
-  },
-  "4": {
-    "titolo": "Punto 4",
-    "marker": [40.4195, 15.228],
-    "popup": "Altro punto",
-    "descrizione": "Descrizione della tappa 2",
-    "steps": [
-      {"instruction": "Segui la strada", "distance": 100}
-    ],
-    "unlockCode": "D"
-  },
-  "5": {
-    "titolo": "Punto 5",
-    "marker": [40.4195, 15.228],
-    "popup": "Altro punto",
-    "descrizione": "Descrizione della tappa 2",
-    "steps": [
-      {"instruction": "Segui la strada", "distance": 100}
-    ],
-    "unlockCode": "E"
+	"unlockCode":"B"	
   }
 }
