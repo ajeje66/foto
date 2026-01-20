@@ -57,6 +57,9 @@
   <button id="prev_page" class="next-btn">Indietro</button>
   <button id="next_page" class="next-btn" disabled>Prosegui</button>
 </div>
+<div style="padding:10px; text-align:center;">
+  <button id="showAllBtn" style="display:none;" class="btn-secondary">Mostra tutte le tappe</button>
+</div>
 
 <div id="qr-toast">
   <b>Scansiona il QR</b>
@@ -72,10 +75,11 @@
 <script>
 function aggiornaProgressBar() {
   const total = Object.keys(TAPPE).length; // numero totale tappe
-  const completed = Math.min(stato.tappa, stato.sbloccata - 1); 
+  const completed = Math.min(stato.tappa, stato.sbloccata); 
   const percent = (completed / total) * 100;
   document.getElementById("progress-bar").style.width = percent + "%";
 }
+
 
 
 /* ===== STATO SPA ===== */
@@ -83,6 +87,14 @@ let TAPPE = {};
 let stato = { tappa: 1, sbloccata: 1 };
 const salvato = localStorage.getItem("percorso");
 if(salvato) stato = JSON.parse(salvato);
+
+function aggiornaShowAllBtn() {
+  const total = Object.keys(TAPPE).length;
+  const allUnlocked = stato.sbloccata >= total; // se sbloccata > numero di tappe
+  const btn = document.getElementById("showAllBtn");
+  btn.style.display = allUnlocked ? "inline-block" : "none";
+}
+
 
 /* ===== MAPPA ===== */
 const map = L.map("map",{minZoom:15,maxZoom:18}).setView([40.4188, 15.2269], 16);
@@ -127,8 +139,9 @@ function unlock(code){
   } else {
     showToast("Codice / QR errato");
   }
-  nextBtn.disabled = stato.sbloccata < stato.tappa + 1;
-aggiornaProgressBar();
+	nextBtn.disabled = stato.sbloccata < stato.tappa + 1;
+	aggiornaProgressBar();
+	aggiornaShowAllBtn();
 }
 
 /* ===== BUTTON ===== */
@@ -213,7 +226,8 @@ function caricaTappa(n){
   // aggiorna onclick dinamicamente
   nextBtn.onclick = () => {
     if(stato.tappa >= total){
-      window.location.href = "https://tuo-sito-di-destinazione.com";
+      window.location.href = "";
+	  //localStorage.clear();  !!!!!!!!!!!!!============!!!!!!!!!!!!
     } else {
       caricaTappa(stato.tappa + 1);
     }
@@ -221,6 +235,7 @@ function caricaTappa(n){
   
   // aggiorna barra di progresso se presente
   aggiornaProgressBar();
+  aggiornaShowAllBtn();
 
 }
 
@@ -239,6 +254,22 @@ fetch("tappe.json")
     console.error("Errore caricamento tappe:", err);
     showToast("Errore caricamento tappe");
   });
+  
+  
+ /*======MOSTRA TAPPE=======*/
+ document.getElementById("showAllBtn").onclick = () => {
+  for(const key in TAPPE){
+    const t = TAPPE[key];
+    // crea un marker per ogni tappa
+    L.marker(t.marker)
+     .addTo(map)
+     .bindPopup(`<b>${t.titolo}</b><br>${t.popup}`);
+  }
+
+  // opzionale: centra la mappa sulle tappe
+  const bounds = L.latLngBounds(Object.values(TAPPE).map(t => t.marker));
+  map.fitBounds(bounds);
+};
 </script>
 
 </body>
