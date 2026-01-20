@@ -74,8 +74,15 @@
 
 <script>
 function aggiornaProgressBar() {
-  const total = Object.keys(TAPPE).length; // numero totale tappe
-  const completed = Math.min(stato.tappa, stato.sbloccata); 
+  const total = Object.keys(TAPPE).length;
+
+  let completed;
+  if (stato.tappa >= total) {
+    completed = total; // ultima tappa = 100%
+  } else {
+    completed = stato.sbloccata - 1;
+  }
+
   const percent = (completed / total) * 100;
   document.getElementById("progress-bar").style.width = percent + "%";
 }
@@ -218,6 +225,7 @@ function caricaTappa(n){
   if(n >= total){
     nextBtn.textContent = "Fine";
     nextBtn.disabled = false; // sempre cliccabile all'ultima tappa
+	aggiornaProgressBar();
   } else {
     nextBtn.textContent = "Prosegui";
     nextBtn.disabled = stato.sbloccata < n + 1;
