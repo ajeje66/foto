@@ -312,9 +312,16 @@ function caricaQuiz(tappaId) {
   const risposteEl = document.getElementById("quiz-risposte");
   const btn = document.getElementById("quiz-btn");
 
-  const tappa = TAPPE[tappaId];
-  if (!tappa || !tappa.quiz || tappa.quiz.length === 0) {
-    quizDiv.style.display = "none";
+   const tappa = TAPPE[tappaId];
+  
+  if (!tappa) {
+    console.warn("Tappa non trovata:", tappaId);
+    document.getElementById("quiz").style.display = "none";
+    return;
+  }
+  
+  if (!tappa.quiz || tappa.quiz.length === 0) {
+    document.getElementById("quiz").style.display = "none";
     return;
   }
 
@@ -470,6 +477,7 @@ fetch("percorso1.json")
 
 </body>
 </html>
+
 
 
 
