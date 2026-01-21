@@ -438,7 +438,10 @@ prevBtn.onclick = () => { if(stato.tappa > 1) caricaTappa(stato.tappa - 1); };
 
 /* ===== CARICA TAPPE DA JSON ===== */
 fetch("percorso1.json")
-  .then(r=>r.json())
+  .then(r=>{
+    if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+    return r.json();
+  })
   .then(data=>{
     TAPPE = data;
     caricaTappa(stato.tappa);
@@ -467,5 +470,6 @@ fetch("percorso1.json")
 
 </body>
 </html>
+
 
 
