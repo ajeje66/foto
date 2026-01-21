@@ -327,9 +327,10 @@ function caricaQuiz(tappaId) {
 
   quizDiv.style.display = "block";
 
-  if (!stato.quizIndex[tappaId]) stato.quizIndex[tappaId] = 0;
-  const index = stato.quizIndex[tappaId];
-  const q = tappa.quiz[index];
+  if (!stato.quizIndex[tappaId.toString()]) stato.quizIndex[tappaId.toString()] = 0;
+const index = stato.quizIndex[tappaId.toString()];
+const q = tappa.quiz[index];
+
   const quizCounter = document.getElementById("quiz-counter");
   quizCounter.textContent = `Domanda ${index + 1} di ${tappa.quiz.length}`;
 
@@ -477,6 +478,7 @@ fetch("percorso1.json")
 
 </body>
 </html>
+
 
 
 
