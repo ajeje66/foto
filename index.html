@@ -28,42 +28,21 @@
   #qr-reader { width:300px; margin-top:10px; }
   #closeToast { margin-top:10px; width:100%; padding:5px; }
   #codeInput { padding:5px; width:180px; }
-  .tappa-circle {
-  width:30px;
-  height:30px;
-  border-radius:50%;
-  background:#ddd;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-weight:bold;
-  color:#555;
-  cursor:pointer;
-  transition: all 0.3s;
-}
-.tappa-circle.completed {
-  background:#28a61b;
-  color:#fff;
-}
-.tappa-circle.current {
-  border:3px solid #a51b1b;
-}
-
 </style>
 </head>
 
 <body>
 <div style="padding:10px 20px;">
-	<div id="progress-container" style="display:flex; justify-content:space-between; align-items:center; margin:10px 20px;">
-	</div>
-
+  <div id="progress-container" style="background:#e5e5e5; border-radius:10px; height:20px; width:100%;">
+    <div id="progress-bar" style="background:#28a61b; height:100%; width:0%; border-radius:10px;"></div>
+  </div>
 </div>
 <div id="map"></div>
 
 <div style="padding:10px; text-align:center; background:#eee;border-bottom: 1px solid black;">
   <button class="btn-secondary" id="toggleInstructionsBtn">Mostra istruzioni</button>
   <button class="btn-secondary" id="toggleDescrizioneBtn">Mostra descrizione</button>
-  <button class="btn-secondary" id="toggleDomanda">Nascondi domanda</button>
+  <button class="btn-secondary" id="toggleDomanda">Nascondi domanda</button><br>
   <button class="btn-secondary" id="centra" style="font-size:10px">Centra su ultima tappa</button>
   <button id="showAllBtn" style="display:none;" class="btn-secondary">Mostra tutte le tappe</button>
 
@@ -72,17 +51,12 @@
 <div id="instructions"></div>
 <div id="descrizione"></div>
 
-<div id="quiz" class="show">	
-	<div id="quiz-counter" style="margin-bottom:5px; font-weight:bold; text-align:center;"></div>
-	<div style="font-size:19px; font-weight:bold;" id="quiz-domanda"></div>
-	<div id="quiz-risposte"></div> 
-	<button id="quiz-btn" class="btn-risposta">
-		Conferma risposta
-	</button>
-	<div id="quiz-navigation" style="text-align:center;">
-		<button id="quiz-prev" class="btn-secondary">⬅ Indietro</button>
-		<button id="quiz-next" class="btn-secondary">Avanti ➡</button>
-	</div> 
+<div id="quiz" class="show">
+  <h3 id="quiz-domanda"></h3>
+  <div id="quiz-risposte"></div>
+  <button id="quiz-btn" class="btn-risposta" style="margin-top:10px;">
+    Conferma risposta
+  </button>
 </div>
 
 
@@ -93,7 +67,7 @@
 </div>
 
 
-<div style="display:flex; justify-content:center; padding:10px;">
+<div style="display:flex; justify-content:center; padding:20px;">
   <button id="prev_page" class="next-btn">Indietro</button>
   <button id="next_page" class="next-btn" disabled>Prosegui</button>
 </div>
@@ -111,43 +85,35 @@
 <script src="html5-qrcode.min.js"></script>
 
 <script>
-const PERCORSO_ID = "Percorso1";//!!!!!!!========!!!!!!
+const PERCORSO_ID = "Percorso2";//!!!!!!!========!!!!!!
 function key(nome){
   return `${PERCORSO_ID}_${nome}`;
 }
 
 function aggiornaProgressBar() {
-  const container = document.getElementById("progress-container");
-  container.innerHTML = "";
   const total = Object.keys(TAPPE).length;
 
-  for(let i=1; i<=total; i++){
-    const circle = document.createElement("div");
-    circle.className = "tappa-circle";
-
-    if(i < stato.sbloccata || i === 1) circle.classList.add("completed");
-    if(i === stato.tappa) circle.classList.add("current");
-
-    circle.textContent = i;
-    circle.onclick = () => {
-      if(i <= stato.sbloccata) caricaTappa(i); // permette clic solo su tappe sbloccate
-    }
-
-    container.appendChild(circle);
+  let completed;
+  if (stato.tappa >= total) {
+    completed = total; // ultima tappa = 100%
+  } else {
+    completed = stato.sbloccata - 1;
   }
+
+  const percent = (completed / total) * 100;
+  document.getElementById("progress-bar").style.width = percent + "%";
 }
+
+
 
 /* ===== STATO SPA ===== */
 let TAPPE = {};
 let stato = { tappa: 1, sbloccata: 1 };
-stato.quizIndex = stato.quizIndex || {};
-
 
 const salvato = localStorage.getItem(key("percorso"));
 if (salvato) stato = JSON.parse(salvato);
 stato.quizSuperati = JSON.parse(localStorage.getItem(key("quizSuperati"))) || {};
 stato.punteggio = Number(localStorage.getItem(key("punteggio"))) || 0;
-stato.risposteDate = JSON.parse(localStorage.getItem(key("risposteDate"))) || {};
 let codiciUsati = JSON.parse(localStorage.getItem(key("codiciUsati"))) || [];
 
 function aggiornaShowAllBtn() {
@@ -300,144 +266,98 @@ function caricaTappa(n){
       caricaTappa(stato.tappa + 1);
     }
   };
-	aggiornaProgressBar();
-	aggiornaShowAllBtn();
+  
+  // aggiorna barra di progresso se presente
+  aggiornaProgressBar();
+  aggiornaShowAllBtn();
 	caricaQuiz(n);
 }
 
-/*=======QUIZ=========*/
 function caricaQuiz(tappaId) {
   const quizDiv = document.getElementById("quiz");
   const domandaEl = document.getElementById("quiz-domanda");
   const risposteEl = document.getElementById("quiz-risposte");
   const btn = document.getElementById("quiz-btn");
 
-   const tappa = TAPPE[tappaId];
-  
-  if (!tappa) {
-    console.warn("Tappa non trovata:", tappaId);
-    document.getElementById("quiz").style.display = "none";
-    return;
-  }
-  
-  if (!tappa.quiz || tappa.quiz.length === 0) {
-    document.getElementById("quiz").style.display = "none";
+  const tappa = TAPPE[tappaId];
+  if (!tappa || !tappa.quiz || tappa.quiz.length === 0) {
+    quizDiv.style.display = "none";
     return;
   }
 
   quizDiv.style.display = "block";
-
-  if (!stato.quizIndex[tappaId.toString()]) stato.quizIndex[tappaId.toString()] = 0;
-const index = stato.quizIndex[tappaId.toString()];
-const q = tappa.quiz[index];
-
-  const quizCounter = document.getElementById("quiz-counter");
-  quizCounter.textContent = `Domanda ${index + 1} di ${tappa.quiz.length}`;
-
-  // quiz finito
-  if (!q) {
-    domandaEl.textContent = "Quiz completato 🎉";
+  
+  // Se il quiz è già stato completato
+  if (stato.quizSuperati[tappaId]) {
+    const q = tappa.quiz[0]; // prendi la prima domanda (o adatta se ci sono più domande)
+    domandaEl.textContent = q.domanda;
     risposteEl.innerHTML = "";
-    btn.style.display = "none";
-    stato.quizSuperati[tappaId] = true;
-    localStorage.setItem(key("quizSuperati"), JSON.stringify(stato.quizSuperati));
+
+    q.risposte.forEach((r, i) => {
+      const label = document.createElement("label");
+      label.style.display = "block";
+      label.textContent = r;
+      // evidenzia la risposta corretta
+      if (i === q.corretta) {
+        label.style.color = "green";
+        label.style.fontWeight = "bold";
+      }
+      risposteEl.appendChild(label);
+    });
+
+    btn.style.display = "none"; // blocca la possibilità di rispondere
     return;
   }
 
+  // Quiz da svolgere
+  const q = tappa.quiz[0]; // prima domanda
   domandaEl.textContent = q.domanda;
   risposteEl.innerHTML = "";
   btn.style.display = "inline-block";
   btn.disabled = false;
 
-  q.risposte.forEach((r, i) => {
+  q.risposte.forEach((r,i) => {
     const label = document.createElement("label");
     label.style.display = "block";
     label.innerHTML = `<input type="radio" name="quiz" value="${i}"> ${r}`;
     risposteEl.appendChild(label);
   });
-  // SE LA DOMANDA ERA GIA' STATA RISPONSA
-	const risposteSalvate = stato.risposteDate?.[tappaId]?.[index];
-	if(risposteSalvate !== undefined){
-		const radio = risposteEl.querySelector(`input[value="${risposteSalvate}"]`);
-		if(radio) radio.checked = true;
-
-		// evidenzia risposta corretta
-		document.querySelectorAll('label').forEach((label, i) => {
-			if(i === q.corretta){
-				label.style.color = "green";
-				label.style.fontWeight = "bold";
-			}
-		});
-
-		// disabilita radio e bottone conferma
-		document.querySelectorAll('input[name="quiz"]').forEach(r => r.disabled = true);
-		btn.disabled = true;
-	}
-
-  btn.style.display = "inline-block";
-  btn.disabled = false;
-  
-	const quizPrevBtn = document.getElementById("quiz-prev");
-	const quizNextBtn = document.getElementById("quiz-next");
-	
-	quizPrevBtn.onclick = () => {
-	const tappaId = stato.tappa;
-	if(stato.quizIndex[tappaId] > 0){
-		stato.quizIndex[tappaId]--;
-		caricaQuiz(tappaId);
-	}
-	};
-	
-	quizNextBtn.onclick = () => {
-	const tappaId = stato.tappa;
-	const t = TAPPE[tappaId];
-	if(stato.quizIndex[tappaId] < t.quiz.length - 1){
-		stato.quizIndex[tappaId]++;
-		caricaQuiz(tappaId);
-	}
-	
-	};
 
   btn.onclick = () => {
     const selected = document.querySelector('input[name="quiz"]:checked');
-    if (!selected) {
+    if(!selected){
       showToast("Seleziona una risposta");
       return;
     }
 
     const rispostaIndex = Number(selected.value);
-    document.querySelectorAll('input[name="quiz"]').forEach(r => r.disabled = true);
+
+    // blocca le opzioni
+    document.querySelectorAll('input[name="quiz"]').forEach(r=>r.disabled = true);
     btn.disabled = true;
 
+    // mostra risposta corretta
     document.querySelectorAll('label').forEach((label, i) => {
-      if (i === q.corretta) {
+      if(i === q.corretta){
         label.style.color = "green";
         label.style.fontWeight = "bold";
       }
     });
 
-    if (rispostaIndex === q.corretta) {
+    if(rispostaIndex === q.corretta){
       stato.punteggio += q.punti;
       showToast(`Risposta corretta! +${q.punti} punti`);
     } else {
-      showToast(`Risposta errata`);
+      showToast(`Risposta errata \n Risposta corretta: ${q.corretta+1}`);
     }
-	
-	// salva la risposta data
-	if(!stato.quizSuperati[tappaId]) stato.quizSuperati[tappaId] = [];
-	stato.quizSuperati[tappaId].push(index);
 
-	// SALVATAGGIO RISPOSTA SCELTA
-	if(!stato.risposteDate) stato.risposteDate = {};
-	if(!stato.risposteDate[tappaId]) stato.risposteDate[tappaId] = {};
-	stato.risposteDate[tappaId][index] = rispostaIndex;
-
-	localStorage.setItem(key("punteggio"), stato.punteggio);
+    // salva che il quiz è stato completato
+    stato.quizSuperati[tappaId] = true;
 	localStorage.setItem(key("quizSuperati"), JSON.stringify(stato.quizSuperati));
-	localStorage.setItem(key("risposteDate"), JSON.stringify(stato.risposteDate));
+	localStorage.setItem(key("punteggio"), stato.punteggio);
+	
   };
 }
-
 
 
 /* ===== NAVIGAZIONE ===== */
@@ -446,10 +366,7 @@ prevBtn.onclick = () => { if(stato.tappa > 1) caricaTappa(stato.tappa - 1); };
 
 /* ===== CARICA TAPPE DA JSON ===== */
 fetch("percorso1.json")
-  .then(r=>{
-    if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
-    return r.json();
-  })
+  .then(r=>r.json())
   .then(data=>{
     TAPPE = data;
     caricaTappa(stato.tappa);
@@ -478,8 +395,3 @@ fetch("percorso1.json")
 
 </body>
 </html>
-
-
-
-
-
